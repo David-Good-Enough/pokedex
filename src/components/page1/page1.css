@@ -1,0 +1,14 @@
+
+
+.list-pokemon {
+
+    display: flex;
+    margin: 20px;
+}
+
+.cadre-pokemon {
+    background-color: white;
+    width: auto;
+    border: solid;
+    padding: 20px;
+}
