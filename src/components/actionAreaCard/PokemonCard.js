@@ -12,7 +12,6 @@ const PokemonCard = ({ pokemon }) => {
             <Card sx={{ maxWidth: 345 }}>
                 <CardMedia
                     component="img"
-                    height="140"
                     image={pokemon.image}
                     alt={pokemon.name}
                 />
