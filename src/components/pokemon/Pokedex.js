@@ -5,20 +5,19 @@ import PokemonCard from '../actionAreaCard/PokemonCard';
 
 
 
-const Pokedex = () => {
-
+const Pokedex = ({ language }) => {
     const [pokemons, setPokemons] = useState([]);
 
     useEffect(() => {
+        console.log("Language in Pokedex:", language); // Vérifie ici la valeur reçue
         fetch('/pokedex.json')
             .then((response) => response.json())
             .then((data) => {
-                // Transformation des données pour correspondre aux propriétés attendues par PokemonCard
                 const transformedData = data.map((pokemon) => ({
                     id: pokemon.id,
-                    name: pokemon.names.fr, // Utilisation du nom en français
+                    name: pokemon.names?.[language] ?? pokemon.names.fr,
                     image: pokemon.image,
-                    types: pokemon.types.map(type => type.charAt(0).toUpperCase() + type.slice(1)), // Capitaliser les types
+                    types: pokemon.types.map(type => type.charAt(0).toUpperCase() + type.slice(1)),
                     height: pokemon.height,
                     weight: pokemon.weight,
                     moves: pokemon.moves,
@@ -26,7 +25,7 @@ const Pokedex = () => {
                 setPokemons(transformedData);
             })
             .catch((error) => console.error('Erreur lors du chargement des données:', error));
-    }, []);
+    }, [language]);
 
     return (
         <Container>
@@ -38,5 +37,6 @@ const Pokedex = () => {
         </Container>
     );
 };
+
 
 export default Pokedex;
