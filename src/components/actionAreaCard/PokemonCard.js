@@ -7,29 +7,6 @@ import Grid from '@mui/material/Grid';
 import { Chip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
-const typeColors = {
-    Grass: 'green',
-    Poison: 'purple',
-    Fire: 'red',
-    Water: 'blue',
-    Electric: 'yellow',
-    Psychic: 'pink',
-    Ice: 'lightblue',
-    Dragon: 'orange',
-    Dark: 'black',
-    Fairy: 'lightpink',
-    Normal: 'gray',
-    Fighting: 'brown',
-    Flying: 'skyblue',
-    Bug: 'limegreen',
-    Rock: 'darkgoldenrod',
-    Ghost: 'indigo',
-    Steel: 'slategray',
-    Ground: 'saddlebrown'
-};
-
-const getTypeColor = (type) => typeColors[type] || 'gray';
-
 const PokemonCard = ({ pokemon }) => {
     const navigate = useNavigate();
 
@@ -39,14 +16,20 @@ const PokemonCard = ({ pokemon }) => {
 
     return (
         <Grid item xs={12} sm={6} md={4} lg={3}>
-            <Card 
-                sx={{ maxWidth: 345, cursor: 'pointer' }}
+            <Card
+                sx={{
+                    maxWidth: 345,
+                    cursor: 'pointer',
+                    backgroundColor: '#f4f4f4',
+                    borderRadius: '8px',
+                }}
                 onClick={handleCardClick}
             >
                 <CardMedia
                     component="img"
                     image={pokemon.image}
                     alt={pokemon.name}
+                    sx={{ backgroundColor: '#eaeaea' }}
                 />
                 <CardContent>
                     <Typography gutterBottom variant="h5" component="div">
@@ -56,15 +39,15 @@ const PokemonCard = ({ pokemon }) => {
                         No.{pokemon.id}
                     </Typography>
                     <div>
-                        {pokemon.types.map((type) => (
-                            <Chip 
-                                key={type}
-                                label={type} 
-                                style={{ 
-                                    backgroundColor: getTypeColor(type), 
-                                    color: 'white', 
-                                    margin: '5px' 
-                                }} 
+                        {pokemon.types.map(({ englishName, translatedName, color }) => (
+                            <Chip
+                                key={englishName}
+                                label={translatedName} // Affiche le nom traduit
+                                style={{
+                                    backgroundColor: color, // Couleur du type
+                                    color: 'white',
+                                    margin: '5px',
+                                }}
                             />
                         ))}
                     </div>
