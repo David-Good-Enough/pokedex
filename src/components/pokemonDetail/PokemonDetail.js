@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PokemonClient, UtilityClient } from "pokenode-ts";
-import { Card, CardContent, Typography, Chip, Box, Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
+import { PokemonClient } from "pokenode-ts";
+import { Card, CardContent, Typography, Chip, Box, Accordion, AccordionSummary, AccordionDetails, Button } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 const TYPE_COLORS = {
@@ -29,12 +29,12 @@ const PokemonDetail = ({ language }) => {
     const { id } = useParams();
     const [pokemon, setPokemon] = useState(null);
     const [error, setError] = useState(null);
+    const [moveLimit, setMoveLimit] = useState(10); // Nombre de mouvements à afficher initialement
 
     useEffect(() => {
         const fetchPokemon = async () => {
             try {
                 const pokemonApi = new PokemonClient();
-                const utilityApi = new UtilityClient();
 
                 // Récupérer les données du Pokémon
                 const data = await pokemonApi.getPokemonById(parseInt(id, 10));
@@ -46,32 +46,33 @@ const PokemonDetail = ({ language }) => {
                     return acc;
                 }, {});
 
-                // Traduire les types en fonction de la langue
+                // Traduction et gestion des types
                 const translatedTypes = await Promise.all(
-                    data.types.map(async (typeInfo) => {
+                    data.types.map(async (type) => {
                         try {
-                            const typeData = await utilityApi.getTypeByName(typeInfo.type.name);
-                            const translatedType =
+                            const typeData = await pokemonApi.getTypeByName(type.type.name);
+                            const translatedName =
                                 typeData.names.find((n) => n.language.name === language)?.name ||
-                                typeData.names.find((n) => n.language.name === "en")?.name ||
-                                typeInfo.type.name;
-
+                                type.type.name;
                             return {
-                                name: translatedType,
-                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                                englishName: type.type.name,
+                                translatedName,
+                                color: TYPE_COLORS[type.type.name] || "#A8A8A8",
                             };
-                        } catch {
+                        } catch (err) {
+                            console.error(`Erreur lors de la traduction du type ${type.type.name}`);
                             return {
-                                name: typeInfo.type.name,
-                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                                englishName: type.type.name,
+                                translatedName: type.type.name,
+                                color: TYPE_COLORS[type.type.name] || "#A8A8A8",
                             };
                         }
                     })
                 );
 
-                // Récupérer les attaques (moves)
+                // Traduire les attaques (moves)
                 const translatedMoves = await Promise.all(
-                    data.moves.slice(0, 10).map(async (moveInfo) => {
+                    data.moves.map(async (moveInfo) => {
                         try {
                             const moveData = await pokemonApi.getMoveByName(moveInfo.move.name);
                             const translatedMove =
@@ -81,16 +82,11 @@ const PokemonDetail = ({ language }) => {
 
                             return {
                                 name: translatedMove,
-                                power: moveData.power || "N/A",
-                                type: moveData.type.name,
-                                accuracy: moveData.accuracy || "N/A",
                             };
-                        } catch {
+                        } catch (err) {
+                            console.error(`Erreur lors de la traduction de l'attaque ${moveInfo.move.name}`);
                             return {
                                 name: moveInfo.move.name,
-                                power: "N/A",
-                                type: "unknown",
-                                accuracy: "N/A",
                             };
                         }
                     })
@@ -171,8 +167,8 @@ const PokemonDetail = ({ language }) => {
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", marginBottom: 2 }}>
                         {pokemon.types.map((type) => (
                             <Chip
-                                key={type.name}
-                                label={type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                                key={type.englishName}
+                                label={type.translatedName}
                                 sx={{
                                     backgroundColor: type.color,
                                     color: "white",
@@ -190,12 +186,17 @@ const PokemonDetail = ({ language }) => {
                         </AccordionSummary>
                         <AccordionDetails>
                             <ul>
-                                {pokemon.moves.map((move) => (
+                                {pokemon.moves.slice(0, moveLimit).map((move) => (
                                     <li key={move.name}>
-                                        <strong>{move.name}</strong> - Type: {move.type}, Power: {move.power}, Accuracy: {move.accuracy}
+                                        <strong>{move.name}</strong>
                                     </li>
                                 ))}
                             </ul>
+                            {moveLimit < pokemon.moves.length && (
+                                <Button onClick={() => setMoveLimit((prev) => prev + 10)} variant="text">
+                                    Show More
+                                </Button>
+                            )}
                         </AccordionDetails>
                     </Accordion>
                 </CardContent>
