@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PokemonClient, UtilityClient } from "pokenode-ts";
+import { PokemonClient } from "pokenode-ts";
 import { Card, CardContent, Typography, Chip, Box } from "@mui/material";
 
 const TYPE_COLORS = {
@@ -32,48 +32,49 @@ const PokemonDetail = ({ language }) => {
     useEffect(() => {
         const fetchPokemon = async () => {
             try {
-                const pokemonApi = new PokemonClient();
-                const utilityApi = new UtilityClient();
+                const api = new PokemonClient();
 
-                // Récupérer les données du Pokémon
-                const data = await pokemonApi.getPokemonById(parseInt(id, 10));
-                const speciesData = await pokemonApi.getPokemonSpeciesById(parseInt(id, 10));
+                // Récupérer les données du Pokémon et de l'espèce
+                const pokemonData = await api.getPokemonById(parseInt(id, 10));
+                const speciesData = await api.getPokemonSpeciesById(parseInt(id, 10));
 
-                // Traduire le nom en fonction de la langue
+                // Traduction des noms
                 const namesByLanguage = speciesData.names.reduce((acc, name) => {
                     acc[name.language.name] = name.name;
                     return acc;
                 }, {});
 
-                // Traduire les types en fonction de la langue
+                // Traduction et gestion des types
                 const translatedTypes = await Promise.all(
-                    data.types.map(async (typeInfo) => {
+                    pokemonData.types.map(async (type) => {
                         try {
-                            const typeData = await utilityApi.getTypeByName(typeInfo.type.name);
-                            const translatedType =
+                            const typeData = await api.getTypeByName(type.type.name);
+                            const translatedName =
                                 typeData.names.find((n) => n.language.name === language)?.name ||
-                                typeInfo.type.name; // Utiliser le nom par défaut si la traduction n'est pas disponible
-
+                                type.type.name;
                             return {
-                                name: translatedType,
-                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                                englishName: type.type.name,
+                                translatedName,
+                                color: TYPE_COLORS[type.type.name] || "#A8A8A8",
                             };
-                        } catch {
-                            // Gestion des erreurs pour un type spécifique
-                            console.error(`Erreur lors de la récupération du type ${typeInfo.type.name}`);
+                        } catch (err) {
+                            console.error(`Erreur lors de la traduction du type ${type.type.name}`);
                             return {
-                                name: typeInfo.type.name,
-                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                                englishName: type.type.name,
+                                translatedName: type.type.name,
+                                color: TYPE_COLORS[type.type.name] || "#A8A8A8",
                             };
                         }
                     })
                 );
 
+                // Définir les données du Pokémon
                 setPokemon({
+                    id: pokemonData.id,
                     name: namesByLanguage[language] || speciesData.name,
-                    image: data.sprites.other["official-artwork"].front_default || data.sprites.front_default,
-                    height: data.height,
-                    weight: data.weight,
+                    image: pokemonData.sprites.other["official-artwork"].front_default || pokemonData.sprites.front_default,
+                    height: pokemonData.height,
+                    weight: pokemonData.weight,
                     types: translatedTypes,
                 });
             } catch (err) {
@@ -86,11 +87,11 @@ const PokemonDetail = ({ language }) => {
     }, [id, language]);
 
     if (error) {
-        return <div>{error}</div>;
+        return <div style={{ color: "red", textAlign: "center" }}>{error}</div>;
     }
 
     if (!pokemon) {
-        return <div>Chargement...</div>;
+        return <div style={{ textAlign: "center" }}>Chargement...</div>;
     }
 
     return (
@@ -143,8 +144,8 @@ const PokemonDetail = ({ language }) => {
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                         {pokemon.types.map((type) => (
                             <Chip
-                                key={type.name}
-                                label={type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                                key={type.englishName}
+                                label={type.translatedName.charAt(0).toUpperCase() + type.translatedName.slice(1)}
                                 sx={{
                                     backgroundColor: type.color,
                                     color: "white",
