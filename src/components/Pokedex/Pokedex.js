@@ -1,155 +1,162 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Grid from '@mui/material/Grid';
-import Container from '@mui/material/Container';
-import { PokemonClient } from 'pokenode-ts';
-import PokemonCard from '../actionAreaCard/PokemonCard';
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { PokemonClient, UtilityClient } from "pokenode-ts";
+import { Card, CardContent, Typography, Chip, Box } from "@mui/material";
 
-// Couleurs associées aux types Pokémon
 const TYPE_COLORS = {
-    grass: '#78C850',
-    poison: '#A040A0',
-    fire: '#F08030',
-    water: '#6890F0',
-    electric: '#F8D030',
-    psychic: '#F85888',
-    ice: '#98D8D8',
-    dragon: '#7038F8',
-    dark: '#705848',
-    fairy: '#EE99AC',
-    normal: '#A8A878',
-    fighting: '#C03028',
-    flying: '#A890F0',
-    bug: '#A8B820',
-    rock: '#B8A038',
-    ghost: '#705898',
-    steel: '#B8B8D0',
-    ground: '#E0C068',
+    grass: "#78C850",
+    poison: "#A040A0",
+    fire: "#F08030",
+    water: "#6890F0",
+    electric: "#F8D030",
+    psychic: "#F85888",
+    ice: "#98D8D8",
+    dragon: "#7038F8",
+    dark: "#705848",
+    fairy: "#EE99AC",
+    normal: "#A8A878",
+    fighting: "#C03028",
+    flying: "#A890F0",
+    bug: "#A8B820",
+    rock: "#B8A038",
+    ghost: "#705898",
+    steel: "#B8B8D0",
+    ground: "#E0C068",
 };
 
-const Pokedex = ({ language }) => {
-    const [pokemons, setPokemons] = useState([]);
-    const [offset, setOffset] = useState(0); // Début de la pagination
-    const [isLoading, setIsLoading] = useState(false);
+const PokemonDetail = ({ language }) => {
+    const { id } = useParams();
+    const [pokemon, setPokemon] = useState(null);
     const [error, setError] = useState(null);
-    const [hasMore, setHasMore] = useState(true); // Contrôle s'il reste des Pokémon à charger
-    const observer = useRef(null); // Référence pour l'observer
-    const loadingRef = useRef(false); // Drapeau temporaire pour empêcher les appels multiples
-    const LIMIT = 20; // Nombre de Pokémon par page
 
-    // Fonction pour charger un lot de Pokémon
-    const fetchPokemons = useCallback(async (reset = false) => {
-        if (loadingRef.current || !hasMore) return; // Bloque si déjà en cours ou plus de données
-        loadingRef.current = true; // Active le drapeau
-
-        const api = new PokemonClient();
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // Récupérer un lot de Pokémon
-            const pokemonList = await api.listPokemonSpecies(reset ? 0 : offset, LIMIT);
-
-            // Si aucun résultat n'est retourné, arrêter le chargement
-            if (pokemonList.results.length === 0) {
-                setHasMore(false);
-                return;
-            }
-
-            // Récupérer les détails pour chaque Pokémon
-            const pokemonDetails = await Promise.all(
-                pokemonList.results.map(async (pokemon) => {
-                    const speciesData = await api.getPokemonSpeciesByName(pokemon.name);
-                    const pokemonData = await api.getPokemonByName(pokemon.name);
-
-                    return {
-                        id: speciesData.id,
-                        name:
-                            speciesData.names.find((n) => n.language.name === language)?.name ||
-                            speciesData.name,
-                        image: pokemonData.sprites.front_default,
-                        types: await Promise.all(
-                            pokemonData.types.map(async (type) => {
-                                const typeData = await api.getTypeByName(type.type.name);
-                                const translatedName =
-                                    typeData.names.find((n) => n.language.name === language)
-                                        ?.name || type.type.name;
-                                return {
-                                    englishName: type.type.name,
-                                    translatedName,
-                                    color: TYPE_COLORS[type.type.name] || '#A8A8A8',
-                                };
-                            })
-                        ),
-                        height: pokemonData.height,
-                        weight: pokemonData.weight,
-                    };
-                })
-            );
-
-            // Si on recharge toute la liste (après changement de langue)
-            if (reset) {
-                setPokemons(pokemonDetails);
-                setOffset(LIMIT);
-                setHasMore(true);
-            } else {
-                setPokemons((prev) => [...prev, ...pokemonDetails]); // Ajoute les nouveaux Pokémon
-                setOffset((prev) => prev + LIMIT); // Augmente l'offset pour le prochain lot
-            }
-        } catch (err) {
-            console.error('Erreur lors du chargement des données :', err);
-            setError('Impossible de charger les données.');
-        } finally {
-            setTimeout(() => {
-                loadingRef.current = false; // Libère le drapeau
-            }, 300);
-            setIsLoading(false);
-        }
-    }, [offset, language, hasMore]);
-
-    // Recharger la liste lors du changement de langue
     useEffect(() => {
-        fetchPokemons(true); // Réinitialise les données avec `reset=true`
-    }, [language, fetchPokemons]);
+        const fetchPokemon = async () => {
+            try {
+                const pokemonApi = new PokemonClient();
+                const utilityApi = new UtilityClient();
 
-    // Initialiser l'observer d'intersection
-    useEffect(() => {
-        const sentinel = document.querySelector('#sentinel');
+                // Récupérer les données du Pokémon
+                const data = await pokemonApi.getPokemonById(parseInt(id, 10));
+                const speciesData = await pokemonApi.getPokemonSpeciesById(parseInt(id, 10));
 
-        if (!sentinel) return;
+                // Traduire le nom en fonction de la langue
+                const namesByLanguage = speciesData.names.reduce((acc, name) => {
+                    acc[name.language.name] = name.name;
+                    return acc;
+                }, {});
 
-        observer.current = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) {
-                    fetchPokemons();
-                }
-            },
-            { threshold: 1.0 }
-        );
+                // Traduire les types en fonction de la langue
+                const translatedTypes = await Promise.all(
+                    data.types.map(async (typeInfo) => {
+                        try {
+                            const typeData = await utilityApi.getTypeByName(typeInfo.type.name);
+                            const translatedType =
+                                typeData.names.find((n) => n.language.name === language)?.name || // Recherche par langue
+                                typeData.names.find((n) => n.language.name === "en")?.name || // Fallback en anglais
+                                typeInfo.type.name; // Nom par défaut
 
-        observer.current.observe(sentinel);
+                            return {
+                                name: translatedType,
+                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                            };
+                        } catch {
+                            console.error(`Erreur lors de la récupération du type ${typeInfo.type.name}`);
+                            return {
+                                name: typeInfo.type.name,
+                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                            };
+                        }
+                    })
+                );
 
-        return () => {
-            if (observer.current) observer.current.disconnect();
+                setPokemon({
+                    name: namesByLanguage[language] || speciesData.name,
+                    image: data.sprites.other["official-artwork"].front_default || data.sprites.front_default,
+                    height: data.height,
+                    weight: data.weight,
+                    types: translatedTypes,
+                });
+            } catch (err) {
+                console.error("Erreur lors de la récupération des données :", err);
+                setError("Impossible de récupérer les données du Pokémon.");
+            }
         };
-    }, [fetchPokemons]);
+
+        fetchPokemon();
+    }, [id, language]);
 
     if (error) {
-        return <div>{error}</div>;
+        return <div style={{ color: "red", textAlign: "center" }}>{error}</div>;
+    }
+
+    if (!pokemon) {
+        return <div style={{ textAlign: "center" }}>Chargement...</div>;
     }
 
     return (
-        <Container>
-            <Grid container spacing={3}>
-                {pokemons.map((pokemon) => (
-                    <PokemonCard key={pokemon.id} pokemon={pokemon} />
-                ))}
-            </Grid>
-            {isLoading && <div>Chargement des Pokémon...</div>}
-            {!hasMore && <div>Fin de la liste des Pokémon.</div>}
-            {/* Sentinelle pour déclencher le chargement suivant */}
-            <div id="sentinel" style={{ height: '20px', marginBottom: '20px' }}></div>
-        </Container>
+        <Box
+            sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                minHeight: "100vh",
+                backgroundColor: "rgb(66, 71, 94)",
+                padding: 2,
+            }}
+        >
+            <Card
+                sx={{
+                    maxWidth: 400,
+                    backgroundColor: "#f4f4f4",
+                    borderRadius: "16px",
+                    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
+                }}
+            >
+                <CardContent>
+                    <Typography
+                        variant="h4"
+                        component="div"
+                        sx={{ textAlign: "center", marginBottom: 2, fontWeight: "bold" }}
+                    >
+                        {pokemon.name}
+                    </Typography>
+                    <Box sx={{ display: "flex", justifyContent: "center", marginBottom: 2 }}>
+                        <img
+                            src={pokemon.image}
+                            alt={pokemon.name}
+                            style={{
+                                width: "200px",
+                                height: "200px",
+                                objectFit: "contain",
+                            }}
+                        />
+                    </Box>
+                    <Typography variant="body1" component="p" sx={{ marginBottom: 1 }}>
+                        <strong>Height:</strong> {pokemon.height}
+                    </Typography>
+                    <Typography variant="body1" component="p" sx={{ marginBottom: 1 }}>
+                        <strong>Weight:</strong> {pokemon.weight}
+                    </Typography>
+                    <Typography variant="body1" component="p" sx={{ marginBottom: 1 }}>
+                        <strong>Types:</strong>
+                    </Typography>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                        {pokemon.types.map((type) => (
+                            <Chip
+                                key={type.name}
+                                label={type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                                sx={{
+                                    backgroundColor: type.color,
+                                    color: "white",
+                                    fontWeight: "bold",
+                                }}
+                            />
+                        ))}
+                    </Box>
+                </CardContent>
+            </Card>
+        </Box>
     );
 };
 
-export default Pokedex;
+export default PokemonDetail;
