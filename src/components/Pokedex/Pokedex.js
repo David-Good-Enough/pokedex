@@ -28,117 +28,113 @@ const TYPE_COLORS = {
 
 const Pokedex = ({ language }) => {
     const [pokemons, setPokemons] = useState([]);
-    const [offset, setOffset] = useState(0);
+    const [offset, setOffset] = useState(0); // Début de la pagination
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(true); // Contrôle s'il reste des Pokémon à charger
+    const observer = useRef(null); // Référence pour l'observer
+    const loadingRef = useRef(false); // Drapeau temporaire pour empêcher les appels multiples
+    const LIMIT = 20; // Nombre de Pokémon par page
 
-    const observer = useRef(null);
-    const loadingRef = useRef(false);
-    const pokemonCache = useRef(new Map()); // Cache pour les Pokémon
-    const LIMIT = 20;
-
+    // Fonction pour charger un lot de Pokémon
     const fetchPokemons = useCallback(async (reset = false) => {
-        if (loadingRef.current || !hasMore) return;
-        loadingRef.current = true;
+        if (loadingRef.current || !hasMore) return; // Bloque si déjà en cours ou plus de données
+        loadingRef.current = true; // Active le drapeau
 
         const api = new PokemonClient();
         setIsLoading(true);
         setError(null);
 
         try {
-            console.log('Chargement des Pokémon en cours...');
+            // Récupérer un lot de Pokémon
             const pokemonList = await api.listPokemonSpecies(reset ? 0 : offset, LIMIT);
 
+            // Si aucun résultat n'est retourné, arrêter le chargement
             if (pokemonList.results.length === 0) {
                 setHasMore(false);
-                console.log('Tous les Pokémon ont été chargés.');
                 return;
             }
 
+            // Récupérer les détails pour chaque Pokémon
             const pokemonDetails = await Promise.all(
                 pokemonList.results.map(async (pokemon) => {
-                    if (pokemonCache.current.has(pokemon.name)) {
-                        // Si le Pokémon est dans le cache
-                        console.log(`Cache utilisé pour : ${pokemon.name}`);
-                        return pokemonCache.current.get(pokemon.name);
-                    } else {
-                        // Si le Pokémon doit être récupéré depuis l'API
-                        console.log(`API utilisée pour : ${pokemon.name}`);
-                        const speciesData = await api.getPokemonSpeciesByName(pokemon.name);
-                        const pokemonData = await api.getPokemonByName(pokemon.name);
+                    const speciesData = await api.getPokemonSpeciesByName(pokemon.name);
+                    const pokemonData = await api.getPokemonByName(pokemon.name);
 
-                        const pokemonDetail = {
-                            id: speciesData.id,
-                            name:
-                                speciesData.names.find((n) => n.language.name === language)?.name ||
-                                speciesData.name,
-                            image: pokemonData.sprites.front_default,
-                            types: pokemonData.types.map((type) => ({
-                                name: type.type.name,
-                                color: TYPE_COLORS[type.type.name] || '#A8A8A8',
-                            })),
-                            stats: pokemonData.stats.map((stat) => ({
-                                name: stat.stat.name,
-                                baseStat: stat.base_stat,
-                            })),
-                        };
-
-                        // Ajouter le Pokémon au cache
-                        pokemonCache.current.set(pokemon.name, pokemonDetail);
-
-                        return pokemonDetail;
-                    }
+                    return {
+                        id: speciesData.id,
+                        name:
+                            speciesData.names.find((n) => n.language.name === language)?.name ||
+                            speciesData.name,
+                        image: pokemonData.sprites.front_default,
+                        types: await Promise.all(
+                            pokemonData.types.map(async (type) => {
+                                const typeData = await api.getTypeByName(type.type.name);
+                                const translatedName =
+                                    typeData.names.find((n) => n.language.name === language)
+                                        ?.name || type.type.name;
+                                return {
+                                    englishName: type.type.name,
+                                    translatedName,
+                                    color: TYPE_COLORS[type.type.name] || '#A8A8A8',
+                                };
+                            })
+                        ),
+                        height: pokemonData.height,
+                        weight: pokemonData.weight,
+                    };
                 })
             );
 
+            // Si on recharge toute la liste (après changement de langue)
             if (reset) {
                 setPokemons(pokemonDetails);
                 setOffset(LIMIT);
                 setHasMore(true);
             } else {
-                setPokemons((prev) => [...prev, ...pokemonDetails]);
-                setOffset((prev) => prev + LIMIT);
+                setPokemons((prev) => [...prev, ...pokemonDetails]); // Ajoute les nouveaux Pokémon
+                setOffset((prev) => prev + LIMIT); // Augmente l'offset pour le prochain lot
             }
         } catch (err) {
-            console.error('Erreur lors du chargement des Pokémon :', err);
-            setError('Impossible de charger les Pokémon.');
+            console.error('Erreur lors du chargement des données :', err);
+            setError('Impossible de charger les données.');
         } finally {
-            loadingRef.current = false;
+            setTimeout(() => {
+                loadingRef.current = false; // Libère le drapeau
+            }, 300);
             setIsLoading(false);
         }
     }, [offset, language, hasMore]);
 
+    // Recharger la liste lors du changement de langue
     useEffect(() => {
-        fetchPokemons(true);
+        fetchPokemons(true); // Réinitialise les données avec `reset=true`
     }, [language, fetchPokemons]);
 
+    // Initialiser l'observer d'intersection
     useEffect(() => {
         const sentinel = document.querySelector('#sentinel');
 
         if (!sentinel) return;
 
-        const observerInstance = new IntersectionObserver(
+        observer.current = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !loadingRef.current) {
+                if (entries[0].isIntersecting) {
                     fetchPokemons();
                 }
             },
             { threshold: 1.0 }
         );
 
-        observerInstance.observe(sentinel);
-        observer.current = observerInstance;
+        observer.current.observe(sentinel);
 
         return () => {
-            if (observer.current) {
-                observer.current.disconnect();
-            }
+            if (observer.current) observer.current.disconnect();
         };
     }, [fetchPokemons]);
 
     if (error) {
-        return <div style={{ color: 'red' }}>{error}</div>;
+        return <div>{error}</div>;
     }
 
     return (
@@ -150,6 +146,7 @@ const Pokedex = ({ language }) => {
             </Grid>
             {isLoading && <div>Chargement des Pokémon...</div>}
             {!hasMore && <div>Fin de la liste des Pokémon.</div>}
+            {/* Sentinelle pour déclencher le chargement suivant */}
             <div id="sentinel" style={{ height: '20px', marginBottom: '20px' }}></div>
         </Container>
     );
