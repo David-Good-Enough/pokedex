@@ -3,7 +3,7 @@ import Grid from '@mui/material/Grid';
 import Container from '@mui/material/Container';
 import { PokemonClient } from 'pokenode-ts';
 import PokemonCard from '../actionAreaCard/PokemonCard';
-import SearchBar from '../search/SearchBar';
+import SearchBar from '../SearchBar/SearchBar';
 
 // Couleurs associées aux types Pokémon
 const TYPE_COLORS = {
