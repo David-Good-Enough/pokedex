@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PokemonClient } from "pokenode-ts";
-import { Card, CardContent, Typography, Chip, Box } from "@mui/material";
+import { PokemonClient, UtilityClient } from "pokenode-ts";
+import { Card, CardContent, Typography, Chip, Box, Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 const TYPE_COLORS = {
     grass: "#78C850",
@@ -32,50 +33,76 @@ const PokemonDetail = ({ language }) => {
     useEffect(() => {
         const fetchPokemon = async () => {
             try {
-                const api = new PokemonClient();
+                const pokemonApi = new PokemonClient();
+                const utilityApi = new UtilityClient();
 
-                // Récupérer les données du Pokémon et de l'espèce
-                const pokemonData = await api.getPokemonById(parseInt(id, 10));
-                const speciesData = await api.getPokemonSpeciesById(parseInt(id, 10));
+                // Récupérer les données du Pokémon
+                const data = await pokemonApi.getPokemonById(parseInt(id, 10));
+                const speciesData = await pokemonApi.getPokemonSpeciesById(parseInt(id, 10));
 
-                // Traduction des noms
+                // Traduire le nom en fonction de la langue
                 const namesByLanguage = speciesData.names.reduce((acc, name) => {
                     acc[name.language.name] = name.name;
                     return acc;
                 }, {});
 
-                // Traduction et gestion des types
+                // Traduire les types en fonction de la langue
                 const translatedTypes = await Promise.all(
-                    pokemonData.types.map(async (type) => {
+                    data.types.map(async (typeInfo) => {
                         try {
-                            const typeData = await api.getTypeByName(type.type.name);
-                            const translatedName =
+                            const typeData = await utilityApi.getTypeByName(typeInfo.type.name);
+                            const translatedType =
                                 typeData.names.find((n) => n.language.name === language)?.name ||
-                                type.type.name;
+                                typeData.names.find((n) => n.language.name === "en")?.name ||
+                                typeInfo.type.name;
+
                             return {
-                                englishName: type.type.name,
-                                translatedName,
-                                color: TYPE_COLORS[type.type.name] || "#A8A8A8",
+                                name: translatedType,
+                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
                             };
-                        } catch (err) {
-                            console.error(`Erreur lors de la traduction du type ${type.type.name}`);
+                        } catch {
                             return {
-                                englishName: type.type.name,
-                                translatedName: type.type.name,
-                                color: TYPE_COLORS[type.type.name] || "#A8A8A8",
+                                name: typeInfo.type.name,
+                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
                             };
                         }
                     })
                 );
 
-                // Définir les données du Pokémon
+                // Récupérer les attaques (moves)
+                const translatedMoves = await Promise.all(
+                    data.moves.slice(0, 10).map(async (moveInfo) => {
+                        try {
+                            const moveData = await pokemonApi.getMoveByName(moveInfo.move.name);
+                            const translatedMove =
+                                moveData.names.find((n) => n.language.name === language)?.name ||
+                                moveData.names.find((n) => n.language.name === "en")?.name ||
+                                moveInfo.move.name;
+
+                            return {
+                                name: translatedMove,
+                                power: moveData.power || "N/A",
+                                type: moveData.type.name,
+                                accuracy: moveData.accuracy || "N/A",
+                            };
+                        } catch {
+                            return {
+                                name: moveInfo.move.name,
+                                power: "N/A",
+                                type: "unknown",
+                                accuracy: "N/A",
+                            };
+                        }
+                    })
+                );
+
                 setPokemon({
-                    id: pokemonData.id,
                     name: namesByLanguage[language] || speciesData.name,
-                    image: pokemonData.sprites.other["official-artwork"].front_default || pokemonData.sprites.front_default,
-                    height: pokemonData.height,
-                    weight: pokemonData.weight,
+                    image: data.sprites.other["official-artwork"].front_default || data.sprites.front_default,
+                    height: data.height,
+                    weight: data.weight,
                     types: translatedTypes,
+                    moves: translatedMoves,
                 });
             } catch (err) {
                 console.error("Erreur lors de la récupération des données :", err);
@@ -141,11 +168,11 @@ const PokemonDetail = ({ language }) => {
                     <Typography variant="body1" component="p" sx={{ marginBottom: 1 }}>
                         <strong>Types:</strong>
                     </Typography>
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", marginBottom: 2 }}>
                         {pokemon.types.map((type) => (
                             <Chip
-                                key={type.englishName}
-                                label={type.translatedName.charAt(0).toUpperCase() + type.translatedName.slice(1)}
+                                key={type.name}
+                                label={type.name.charAt(0).toUpperCase() + type.name.slice(1)}
                                 sx={{
                                     backgroundColor: type.color,
                                     color: "white",
@@ -154,6 +181,23 @@ const PokemonDetail = ({ language }) => {
                             />
                         ))}
                     </Box>
+                    <Typography variant="body1" component="p" sx={{ marginBottom: 1 }}>
+                        <strong>Moves:</strong>
+                    </Typography>
+                    <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography>Show Moves</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <ul>
+                                {pokemon.moves.map((move) => (
+                                    <li key={move.name}>
+                                        <strong>{move.name}</strong> - Type: {move.type}, Power: {move.power}, Accuracy: {move.accuracy}
+                                    </li>
+                                ))}
+                            </ul>
+                        </AccordionDetails>
+                    </Accordion>
                 </CardContent>
             </Card>
         </Box>
