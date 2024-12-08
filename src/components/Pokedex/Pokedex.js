@@ -28,16 +28,15 @@ const TYPE_COLORS = {
 
 const Pokedex = ({ language }) => {
     const [pokemons, setPokemons] = useState([]);
-    const [offset, setOffset] = useState(0); // Début de la pagination
+    const [offset, setOffset] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [hasMore, setHasMore] = useState(true); // Contrôle s'il reste des Pokémon à charger
-    const observer = useRef(null); // Référence pour l'observateur
-    const loadingRef = useRef(false); // Drapeau temporaire pour empêcher les appels multiples
-    const LIMIT = 20; // Nombre de Pokémon par page
+    const [hasMore, setHasMore] = useState(true);
 
-    // Cache des données des Pokémon
-    const pokemonCache = useRef(new Map());
+    const observer = useRef(null);
+    const loadingRef = useRef(false);
+    const pokemonCache = useRef(new Map()); // Cache pour les Pokémon
+    const LIMIT = 20;
 
     const fetchPokemons = useCallback(async (reset = false) => {
         if (loadingRef.current || !hasMore) return;
@@ -48,21 +47,24 @@ const Pokedex = ({ language }) => {
         setError(null);
 
         try {
+            console.log('Chargement des Pokémon en cours...');
             const pokemonList = await api.listPokemonSpecies(reset ? 0 : offset, LIMIT);
 
             if (pokemonList.results.length === 0) {
                 setHasMore(false);
+                console.log('Tous les Pokémon ont été chargés.');
                 return;
             }
 
-            // Vérifier le cache avant de faire une requête
             const pokemonDetails = await Promise.all(
                 pokemonList.results.map(async (pokemon) => {
                     if (pokemonCache.current.has(pokemon.name)) {
-                        // Utiliser les données en cache
+                        // Si le Pokémon est dans le cache
+                        console.log(`Cache utilisé pour : ${pokemon.name}`);
                         return pokemonCache.current.get(pokemon.name);
                     } else {
-                        // Récupérer les données si elles ne sont pas en cache
+                        // Si le Pokémon doit être récupéré depuis l'API
+                        console.log(`API utilisée pour : ${pokemon.name}`);
                         const speciesData = await api.getPokemonSpeciesByName(pokemon.name);
                         const pokemonData = await api.getPokemonByName(pokemon.name);
 
@@ -82,7 +84,7 @@ const Pokedex = ({ language }) => {
                             })),
                         };
 
-                        // Mettre à jour le cache
+                        // Ajouter le Pokémon au cache
                         pokemonCache.current.set(pokemon.name, pokemonDetail);
 
                         return pokemonDetail;
