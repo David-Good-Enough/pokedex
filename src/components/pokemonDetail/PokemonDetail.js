@@ -48,15 +48,24 @@ const PokemonDetail = ({ language }) => {
                 // Traduire les types en fonction de la langue
                 const translatedTypes = await Promise.all(
                     data.types.map(async (typeInfo) => {
-                        const typeData = await utilityApi.getTypeByName(typeInfo.type.name);
-                        const translatedType =
-                            typeData.names.find((n) => n.language.name === language)?.name ||
-                            typeInfo.type.name;
+                        try {
+                            const typeData = await utilityApi.getTypeByName(typeInfo.type.name);
+                            const translatedType =
+                                typeData.names.find((n) => n.language.name === language)?.name ||
+                                typeInfo.type.name; // Utiliser le nom par défaut si la traduction n'est pas disponible
 
-                        return {
-                            name: translatedType,
-                            color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
-                        };
+                            return {
+                                name: translatedType,
+                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                            };
+                        } catch {
+                            // Gestion des erreurs pour un type spécifique
+                            console.error(`Erreur lors de la récupération du type ${typeInfo.type.name}`);
+                            return {
+                                name: typeInfo.type.name,
+                                color: TYPE_COLORS[typeInfo.type.name] || "#A8A8A8",
+                            };
+                        }
                     })
                 );
 
