@@ -1,5 +1,5 @@
 import React from 'react';
-import Pokedex from '../pokemon/Pokedex';
+import Pokedex from '../Pokedex/Pokedex';
 
 const Page1 = ({ language }) => {
   return (
